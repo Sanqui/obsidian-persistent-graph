@@ -1,13 +1,11 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
 interface SaveRestoreGraphSettings {
-	nodeCoordinates: [];
+	nodePositions: [];
 }
 
 const DEFAULT_SETTINGS: SaveRestoreGraphSettings = {
-	nodeCoordinates: []
+	nodePositions: []
 }
 
 export default class MyPlugin extends Plugin {
@@ -31,8 +29,9 @@ export default class MyPlugin extends Plugin {
 		return graphLeaves[0];
 	}
 
-	saveNodeCoordinates() {
+	saveNodePositions() {
 		let graphLeaf = this.findGraphLeaf();
+		if (!graphLeaf) return;
 		return graphLeaf.view.renderer.nodes.map((node) => {
 			return {
 				id: node.id,
@@ -42,9 +41,10 @@ export default class MyPlugin extends Plugin {
 		});
 	}
 
-	restoreNodeCoordinates(nodeCoordinates) {
+	restoreNodePositions(nodePositions) {
 		let graphLeaf = this.findGraphLeaf();
-		nodeCoordinates.forEach((node) => {
+		if (!graphLeaf) return;
+		nodePositions.forEach((node) => {
 			graphLeaf.view.renderer.worker.postMessage({
 				forceNode: node,
 			});
@@ -53,12 +53,13 @@ export default class MyPlugin extends Plugin {
 		// force a redraw
 		graphLeaf.view.renderer.worker.postMessage({
 			run: true,
-			alpha: .3
+			alpha: .1
 		});
 		
 		// wait for a render, then unlock nodes
 		setTimeout(() => {
-			nodeCoordinates.forEach((node) => {
+			nodePositions.forEach((node) => {
+				if (!graphLeaf) return;
 				graphLeaf.view.renderer.worker.postMessage({
 					forceNode: {
 						id: node.id,
@@ -70,23 +71,59 @@ export default class MyPlugin extends Plugin {
 		}, 1000);
 	}
 
+	runGraphSimlation() {
+		let graphLeaf = this.findGraphLeaf();
+		if (!graphLeaf) return;
+		graphLeaf.view.renderer.worker.postMessage({
+			run: true,
+			alpha: 1,
+			alphaTarget: 1
+		});
+	}
+
+	stopGraphSimulation() {
+		let graphLeaf = this.findGraphLeaf();
+		if (!graphLeaf) return;
+		graphLeaf.view.renderer.worker.postMessage({
+			run: true,
+			alpha: 0,
+			alphaTarget: 0
+		});
+	}
+
 	async onload() {
 		await this.loadSettings();
 
 		this.addCommand({
-			id: 'save-node-coordinates',
-			name: 'Save graph node coordinates',
+			id: 'save-node-positions',
+			name: 'Save graph node positions',
 			callback: async () => {
-				this.settings.nodeCoordinates = this.saveNodeCoordinates();
+				this.settings.nodePositions = this.saveNodePositions();
 				await this.saveSettings();
 			}
 		});
 		
 		this.addCommand({
-			id: 'restore-node-coordinates',
-			name: 'Restore graph node coordinates',
+			id: 'restore-node-positions',
+			name: 'Restore graph node positions',
 			callback: () => {
-				this.restoreNodeCoordinates(this.settings.nodeCoordinates);
+				this.restoreNodePositions(this.settings.nodePositions);
+			}
+		});
+		
+		this.addCommand({
+			id: 'start-jiggling-graph',
+			name: 'Run graph simulation',
+			callback: () => {
+				this.runGraphSimlation();
+			}
+		});
+		
+		this.addCommand({
+			id: 'stop-jiggling-graph',
+			name: 'Stop graph simulation',
+			callback: () => {
+				this.stopGraphSimulation();
 			}
 		});
 	}
