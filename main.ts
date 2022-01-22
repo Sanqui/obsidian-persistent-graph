@@ -1,15 +1,15 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 
-interface SaveRestoreGraphSettings {
+interface PersistentGraphSettings {
 	nodePositions: [];
 }
 
-const DEFAULT_SETTINGS: SaveRestoreGraphSettings = {
+const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	nodePositions: []
 }
 
-export default class MyPlugin extends Plugin {
-	settings: SaveRestoreGraphSettings;
+export default class PersistentGraphPlugin extends Plugin {
+	settings: PersistentGraphSettings;
 
 	findGraphLeaf() {
 		let activeLeaf = this.app.workspace.activeLeaf;
