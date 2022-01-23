@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "0.12.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "persistent-graph",
+	"version": "0.1.3",
+	"description": "An Obsidian plugin for persisting graph state",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
