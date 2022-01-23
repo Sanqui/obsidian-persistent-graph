@@ -8,7 +8,7 @@ Do you love using the global graph as a powerful spatial tool, but cry every tim
 
 ![Demo video](media/persistent-graph.gif)
 
-This plugin adds commands to save and restore the locations of nodes on your graph.  That's it, it's that simple!  And as a bonus I also added a command to continuously run the graph simulation so you don't have to jiggle it.
+This plugin adds commands to save and restore the locations of nodes on your graph.  There's also a setting to restore automatically whenever you open a new graph view.  That's it, it's that simple!  And as a bonus I also added a command to continuously run the graph simulation so you don't have to jiggle it.
 
 Please note that this plugin makes use of internal Obsidian APIs, so it may break with updates, and it's unlikely to be accepted as a community plugin.  This feature is so important to me that I built it nonetheless, so if you're brave you can enjoy it with me!
 
