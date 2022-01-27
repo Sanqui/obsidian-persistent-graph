@@ -13,11 +13,6 @@ const DEFAULT_SETTINGS: PersistentGraphSettings = {
 export default class PersistentGraphPlugin extends Plugin {
 	settings: PersistentGraphSettings;
 
-	// Since there is no event for a leaf being opened, only
-	// active leaf change, we have to keep a runtime list
-	// of graph leaf ids that have already been recovered
-	recoveredLeafIds: string[] = [];
-
 	findGraphLeaf() {
 		let activeLeaf = this.app.workspace.activeLeaf;
 		if (activeLeaf.view.getViewType() === "graph") {
@@ -101,17 +96,13 @@ export default class PersistentGraphPlugin extends Plugin {
 	}
 
 	onLayoutChange() {
-		let activeLeaf = this.app.workspace.activeLeaf;
+		const activeLeaf = this.app.workspace.activeLeaf;
 
-		if (activeLeaf.view.getViewType() != "graph") {
-			return;
-		}
-
-		if (this.recoveredLeafIds.contains(activeLeaf.id)) {
+		if (activeLeaf.view.getViewType() != "graph" || activeLeaf.view.renderer.autoRestored) {
 			return;
 		}
 			
-		this.recoveredLeafIds.push(activeLeaf.id);
+		activeLeaf.view.renderer.autoRestored = true;
 
 		// We can't restore node positions right away
 		// because not all nodes have been created yet.
@@ -133,12 +124,8 @@ export default class PersistentGraphPlugin extends Plugin {
 			return;
 		}
 
-		if (leaf.view.renderer.autoRestored) {
-			return;
-		}
-
 		if (this.settings.automaticallyRestoreNodePositions) {
-			let currentNodeCount = leaf.view.renderer.nodes.length;
+			const currentNodeCount = leaf.view.renderer.nodes.length;
 
 			if (currentNodeCount === nodeCount) {
 				if (iterations >= 3) {

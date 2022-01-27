@@ -1,11 +1,12 @@
 {
 	"name": "persistent-graph",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "An Obsidian plugin for persisting graph state",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+		"check": "tsc -noEmit -skipLibCheck",
+		"build": "node esbuild.config.mjs production"
 	},
 	"keywords": [],
 	"author": "",
