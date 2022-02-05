@@ -184,7 +184,9 @@ export default class PersistentGraphPlugin extends Plugin {
 
 		// active-leaf-change works for the most part, but doesn't fire
 		// when going from "No file is open", so we have to use layout-change
-		this.app.workspace.on('layout-change', this.onLayoutChange.bind(this));
+		this.registerEvent(
+			this.app.workspace.on('layout-change', this.onLayoutChange.bind(this))
+		);
 	}
 
 	onunload() {
