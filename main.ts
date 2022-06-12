@@ -3,11 +3,13 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 interface PersistentGraphSettings {
 	nodePositions: [];
 	automaticallyRestoreNodePositions: boolean;
+	timesShowedRestoredNotification: number;
 }
 
 const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	nodePositions: [],
-	automaticallyRestoreNodePositions: false
+	automaticallyRestoreNodePositions: false,
+	timesShowedRestoredNotification: 0,
 }
 
 export default class PersistentGraphPlugin extends Plugin {
@@ -114,7 +116,7 @@ export default class PersistentGraphPlugin extends Plugin {
 		}, 1000);
 	}
 
-	restoreOnceNodeCountStable(leaf: WorkspaceLeaf, nodeCount: number, iterations: number, totalIterations: number) {
+	async restoreOnceNodeCountStable(leaf: WorkspaceLeaf, nodeCount: number, iterations: number, totalIterations: number) {
 		//console.log('restoreOnceNodeCountStable, nodeCount: ' + nodeCount + ', iterations: ' + iterations);
 		if (!leaf || !leaf.view || !leaf.view.renderer) {
 			return;
@@ -130,7 +132,11 @@ export default class PersistentGraphPlugin extends Plugin {
 			if (currentNodeCount === nodeCount) {
 				if (iterations >= 3) {
 					this.restoreNodePositions(this.settings.nodePositions, leaf);
-					new Notice('Automatically restored node positions');
+					if (this.settings.timesShowedRestoredNotification < 5 ) {
+						new Notice('Automatically restored node positions');
+						this.settings.timesShowedRestoredNotification++;
+						await this.saveSettings();
+					}
 				} else {
 					setTimeout(() => {
 						this.restoreOnceNodeCountStable(leaf, currentNodeCount, iterations + 1, totalIterations + 1);
