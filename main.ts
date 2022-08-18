@@ -108,7 +108,7 @@ export default class PersistentGraphPlugin extends Plugin {
 		});
 
 		// wait for a render, then unlock nodes
-		setTimeout(() => {
+		setTimeout(async () => {
 			for (let i = 0; i < nodePositions.length; i++) {
 				const node = nodePositions[i];
 
@@ -121,7 +121,12 @@ export default class PersistentGraphPlugin extends Plugin {
 					}
 				});
 			} // end for
-			new Notice('Automatically restored node positions');
+
+			if (this.settings.timesShowedRestoredNotification < 5 ) {
+				new Notice('Automatically restored node positions');
+				this.settings.timesShowedRestoredNotification++;
+				await this.saveSettings();
+			}
 		}, 600);
 	}
 
