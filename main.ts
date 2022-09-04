@@ -1,27 +1,38 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { CustomLeaf, NodePosition, Workspaces, GraphData } from 'types';
 
 interface PersistentGraphSettings {
-	nodePositions: [];
+	nodePositions: NodePosition[];
+	globalOptions: any,
+	workspacesGraphData: {
+		[key: string]: GraphData;
+	};
 	automaticallyRestoreNodePositions: boolean;
+	enableSaveOptions: boolean;
+	enableWorkspaces: boolean;
 	timesShowedRestoredNotification: number;
 }
 
 const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	nodePositions: [],
+	globalOptions: {},
+	workspacesGraphData: {},
 	automaticallyRestoreNodePositions: false,
+	enableSaveOptions: false,
+	enableWorkspaces: false,
 	timesShowedRestoredNotification: 0,
-}
+};
 
 export default class PersistentGraphPlugin extends Plugin {
 	settings: PersistentGraphSettings;
 
-	findGraphLeaf() {
+	findGraphLeaf(): CustomLeaf {
 		let activeLeaf = this.app.workspace.activeLeaf;
-		if (activeLeaf.view.getViewType() === "graph") {
-			return activeLeaf;
+		if (activeLeaf.view.getViewType() === 'graph') {
+			return activeLeaf as CustomLeaf;
 		}
 
-		let graphLeaves = this.app.workspace.getLeavesOfType("graph");
+		let graphLeaves = this.app.workspace.getLeavesOfType('graph');
 		if (graphLeaves.length != 1) {
 			if (graphLeaves.length < 1) {
 				new Notice('No graph view open');
@@ -30,41 +41,77 @@ export default class PersistentGraphPlugin extends Plugin {
 			}
 			return;
 		}
-		return graphLeaves[0];
+		return graphLeaves[0] as CustomLeaf;
 	}
 
-	saveNodePositions() {
+	getActiveWorkspaceName() {
+		if (!this.settings.enableWorkspaces) {
+			return null;
+		}
+		const workspaces = (this.app as any).internalPlugins.getPluginById('workspaces') as Workspaces;
+
+		return workspaces?.instance.activeWorkspace;
+	}
+
+	getGraphData(): GraphData {
+		return this.settings.workspacesGraphData[this.getActiveWorkspaceName()] || {
+			nodePositions: this.settings.nodePositions,
+			options: {}
+		};
+	}
+
+	saveGraphData() {
 		let graphLeaf = this.findGraphLeaf();
 		if (!graphLeaf) return;
-		return graphLeaf.view.renderer.nodes.map((node) => {
+
+		// disable workspaces wName = null
+		const wName = this.getActiveWorkspaceName();
+		const nodes = graphLeaf.view.renderer.nodes.map((node) => {
 			return {
 				id: node.id,
 				x: node.x,
 				y: node.y
 			};
 		});
+
+		const options = !this.settings.enableSaveOptions ? {} : graphLeaf.view.dataEngine.getOptions();
+
+		if (wName) {
+			this.settings.workspacesGraphData[wName] = {
+				options,
+				nodePositions: nodes
+			};
+			return;
+		}
+
+		this.settings.nodePositions = nodes;
+		this.settings.globalOptions = options;
 	}
 
-	restoreNodePositions(nodePositions, graphLeaf?: WorkspaceLeaf) {
+	restoreGraphData(saved: GraphData, graphLeaf?: CustomLeaf) {
 		if (graphLeaf === undefined) {
 			graphLeaf = this.findGraphLeaf();
 		}
 		if (!graphLeaf) return;
+
+		const { nodePositions } = saved;
 		nodePositions.forEach((node) => {
 			graphLeaf.view.renderer.worker.postMessage({
 				forceNode: node,
 			});
 		});
-		
+
 		// force a redraw
 		graphLeaf.view.renderer.worker.postMessage({
 			run: true,
 			alpha: .1
 		});
-		
+
 		// wait for a render, then unlock nodes
-		setTimeout(() => {
-			nodePositions.forEach((node) => {
+		setTimeout(async () => {
+			for (let i = 0; i < nodePositions.length; i++) {
+				const node = nodePositions[i];
+
 				if (!graphLeaf) return;
 				graphLeaf.view.renderer.worker.postMessage({
 					forceNode: {
@@ -73,11 +120,37 @@ export default class PersistentGraphPlugin extends Plugin {
 						y: null
 					}
 				});
-			});
-		}, 1000);
+			} // end for
+
+			if (this.settings.timesShowedRestoredNotification < 5 ) {
+				new Notice('Automatically restored node positions');
+				this.settings.timesShowedRestoredNotification++;
+				await this.saveSettings();
+			}
+		}, 600);
 	}
 
-	runGraphSimlation() {
+	freedWorkspacesData() {
+		if (!this.settings.enableWorkspaces) {
+			return;
+		}
+		const workspaces = (this.app as any).internalPlugins.getPluginById('workspaces') as Workspaces;
+		const workspacesNames = Object.keys(workspaces?.instance.workspaces || {});
+		if (!workspacesNames) {
+			return;
+		}
+		const saveNames = Object.keys(this.settings.workspacesGraphData);
+		saveNames.forEach(name => {
+			if (workspacesNames.includes(name)) {
+				return;
+			}
+
+			delete this.settings.workspacesGraphData[name];
+		});
+		this.saveSettings();
+	}
+
+	runGraphSimulation() {
 		let graphLeaf = this.findGraphLeaf();
 		if (!graphLeaf) return;
 		graphLeaf.view.renderer.worker.postMessage({
@@ -98,26 +171,45 @@ export default class PersistentGraphPlugin extends Plugin {
 	}
 
 	onLayoutChange() {
-		const activeLeaf = this.app.workspace.activeLeaf;
+		const activeLeaf = this.app.workspace.activeLeaf as CustomLeaf;
 
-		if (activeLeaf.view.getViewType() != "graph" || activeLeaf.view.renderer.autoRestored) {
+		if (activeLeaf.view.getViewType() != 'graph' || activeLeaf.view.renderer.autoRestored) {
 			return;
 		}
-			
+
 		activeLeaf.view.renderer.autoRestored = true;
+
+
+		// avoid rerender
+		const { options } = this.getGraphData();
+		let initOptions = {};
+		if (options && options.hasOwnProperty('search')) {
+			initOptions = options;
+		}
+		activeLeaf.view.dataEngine.setOptions({
+			...initOptions,
+			'collapse-filter': false,
+		});
 
 		// We can't restore node positions right away
 		// because not all nodes have been created yet.
 		// So we wait for the node count to stabilize
 		// over 600s.
-
-		setTimeout(() => {
-			this.restoreOnceNodeCountStable(activeLeaf, 0, 0, 0);
-		}, 1000);
+		setTimeout(() => this.awaitRenderLoaded(activeLeaf), 600);
 	}
 
-	async restoreOnceNodeCountStable(leaf: WorkspaceLeaf, nodeCount: number, iterations: number, totalIterations: number) {
-		//console.log('restoreOnceNodeCountStable, nodeCount: ' + nodeCount + ', iterations: ' + iterations);
+	awaitRenderLoaded(activeLeaf: CustomLeaf) {
+		window.requestAnimationFrame(() => {
+			// The graph adds className 'is-loading' to the element when rendering.
+			if (activeLeaf.view.containerEl.querySelector('.mod-search-setting')?.classList?.contains('is-loading')) {
+				this.awaitRenderLoaded(activeLeaf);
+				return;
+			}
+			this.restoreOnceNodeCountStable(activeLeaf, 0, 0, 0);
+		});
+	}
+
+	async restoreOnceNodeCountStable(leaf: CustomLeaf, nodeCount: number, iterations: number, totalIterations: number) {
 		if (!leaf || !leaf.view || !leaf.view.renderer) {
 			return;
 		}
@@ -131,12 +223,7 @@ export default class PersistentGraphPlugin extends Plugin {
 
 			if (currentNodeCount === nodeCount) {
 				if (iterations >= 3) {
-					this.restoreNodePositions(this.settings.nodePositions, leaf);
-					if (this.settings.timesShowedRestoredNotification < 5 ) {
-						new Notice('Automatically restored node positions');
-						this.settings.timesShowedRestoredNotification++;
-						await this.saveSettings();
-					}
+					this.restoreGraphData(this.getGraphData(), leaf);
 				} else {
 					setTimeout(() => {
 						this.restoreOnceNodeCountStable(leaf, currentNodeCount, iterations + 1, totalIterations + 1);
@@ -157,27 +244,27 @@ export default class PersistentGraphPlugin extends Plugin {
 			id: 'save-node-positions',
 			name: 'Save graph node positions',
 			callback: async () => {
-				this.settings.nodePositions = this.saveNodePositions();
+				this.saveGraphData();
 				await this.saveSettings();
 			}
 		});
-		
+
 		this.addCommand({
 			id: 'restore-node-positions',
 			name: 'Restore graph node positions',
 			callback: () => {
-				this.restoreNodePositions(this.settings.nodePositions);
+				this.restoreGraphData(this.getGraphData());
 			}
 		});
-		
+
 		this.addCommand({
 			id: 'run-graph-simulation',
 			name: 'Run graph simulation',
 			callback: () => {
-				this.runGraphSimlation();
+				this.runGraphSimulation();
 			}
 		});
-		
+
 		this.addCommand({
 			id: 'stop-graph-simulation',
 			name: 'Stop graph simulation',
@@ -189,14 +276,17 @@ export default class PersistentGraphPlugin extends Plugin {
 		this.addSettingTab(new PersistentGraphSettingTab(this.app, this));
 
 		// active-leaf-change works for the most part, but doesn't fire
-		// when going from "No file is open", so we have to use layout-change
+		// when going from 'No file is open', so we have to use layout-change
 		this.registerEvent(
 			this.app.workspace.on('layout-change', this.onLayoutChange.bind(this))
+		);
+
+		this.registerEvent(
+			this.app.metadataCache.on('resolved', this.freedWorkspacesData.bind(this))
 		);
 	}
 
 	onunload() {
-
 	}
 
 	async loadSettings() {
@@ -217,11 +307,19 @@ class PersistentGraphSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for PersistentGraphPlugin'});
+		containerEl.createEl('h2', { text: 'Settings for PersistentGraphPlugin' });
+
+		this.UIAutomaticallyRestoreNodePositions();
+		this.UIEnableSaveOptions();
+		this.UIEnableWorkspaces();
+	}
+
+	UIAutomaticallyRestoreNodePositions() {
+		const { containerEl } = this;
 
 		new Setting(containerEl)
 			.setName('Automatically restore node positions')
@@ -235,4 +333,38 @@ class PersistentGraphSettingTab extends PluginSettingTab {
 					})
 			);
 	}
+
+	UIEnableSaveOptions() {
+		const { containerEl } = this;
+
+		new Setting(containerEl)
+			.setName('Save the filtered configuration')
+			.setDesc('Filters, Groups, Display, Forces')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableSaveOptions)
+					.onChange((value) => {
+						this.plugin.settings.enableSaveOptions = value;
+						this.plugin.saveSettings();
+					})
+			);
+	}
+
+	UIEnableWorkspaces() {
+		const { containerEl } = this;
+		// Save graph layout separately for each workspace
+		new Setting(containerEl)
+			.setName('Save graph layout separately for each workspace')
+			.setDesc('Use workspace name as storage key')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableWorkspaces)
+					.onChange((value) => {
+						this.plugin.settings.enableWorkspaces = value;
+						this.plugin.saveSettings();
+					})
+			);
+	}
+
+
 }
