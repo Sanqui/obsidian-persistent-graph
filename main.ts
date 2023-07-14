@@ -81,11 +81,13 @@ export default class PersistentGraphPlugin extends Plugin {
 				options,
 				nodePositions: nodes
 			};
+			new Notice("Node positions saved");
 			return;
 		}
 
 		this.settings.nodePositions = nodes;
 		this.settings.globalOptions = options;
+		new Notice("Node positions saved");
 	}
 
 	restoreGraphData(saved: GraphData, graphLeaf?: CustomLeaf) {
