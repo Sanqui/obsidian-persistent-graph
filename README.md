@@ -1,5 +1,8 @@
 ## Obsidian Persistent Graph Plugin
 
+> [!WARNING]
+> **This project is looking for a new maintainer.**  It might work for your purposes, but there are [issues people would like to see fixed](https://github.com/Sanqui/obsidian-persistent-graph/issues) that I'm unable to devote time to solve currently.  If you are interested in taking over the development of the plugin, please send me an email at me@sanqui.net.
+
 This is a plugin for Obsidian (https://obsidian.md).
 
 Graph lovers, rejoice!
@@ -16,4 +19,5 @@ Possible future features:
 - Automatic/periodic saving
 - Restoring when graph view is open
 - Save & restore graph settings like filters
+
 - Locking nodes in place
