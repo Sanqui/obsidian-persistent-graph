@@ -5,11 +5,18 @@ import { DEFAULT_SETTINGS, PersistentGraphSettings, PersistentGraphSettingTab } 
 export default class PersistentGraphPlugin extends Plugin {
 	settings: PersistentGraphSettings;
 
+	/**
+	 * Helper. Gets the most recently used leaf.
+	 * @returns The active graph leaf, null otherwise.
+	 */
+	private getActiveLeaf(): CustomLeaf {
+		const leaf = this.app.workspace.getMostRecentLeaf();
+		return leaf?.view.getViewType() === 'graph' ? leaf as CustomLeaf : null;
+	}
+
 	findGraphLeaf(): CustomLeaf {
-		let activeLeaf = this.app.workspace.activeLeaf;
-		if (activeLeaf.view.getViewType() === 'graph') {
-			return activeLeaf as CustomLeaf;
-		}
+		const activeLeaf = this.getActiveLeaf();
+		if (activeLeaf) return activeLeaf;
 
 		let graphLeaves = this.app.workspace.getLeavesOfType('graph');
 		if (graphLeaves.length != 1) {
@@ -150,7 +157,9 @@ export default class PersistentGraphPlugin extends Plugin {
 	}
 
 	onLayoutChange() {
-		const activeLeaf = this.app.workspace.activeLeaf as CustomLeaf;
+
+		const activeLeaf = this.getActiveLeaf();
+		if (!activeLeaf) return;
 
 		if (activeLeaf.view.getViewType() != 'graph' || activeLeaf.view.renderer.autoRestored) {
 			return;
