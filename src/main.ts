@@ -72,6 +72,10 @@ export default class PersistentGraphPlugin extends Plugin {
 
 		this.settings.nodePositions = nodes;
 		this.settings.globalOptions = options;
+
+		if (this.settings.showSaveNotification) {
+			new Notice('Graph data saved successfully!');
+		}
 	}
 
 	restoreGraphData(saved: GraphData, graphLeaf?: CustomLeaf) {

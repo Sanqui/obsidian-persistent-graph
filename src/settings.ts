@@ -12,6 +12,7 @@ export interface PersistentGraphSettings {
 	enableSaveOptions: boolean;
 	enableWorkspaces: boolean;
 	timesShowedRestoredNotification: number;
+	showSaveNotification: boolean;
 }
 
 export const DEFAULT_SETTINGS: PersistentGraphSettings = {
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	enableSaveOptions: false,
 	enableWorkspaces: false,
 	timesShowedRestoredNotification: 0,
+	showSaveNotification: false,
 };
 
 export class PersistentGraphSettingTab extends PluginSettingTab {
@@ -42,6 +44,7 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 		this.UIAutomaticallyRestoreNodePositions();
 		this.UIEnableSaveOptions();
 		this.UIEnableWorkspaces();
+		this.UIShowSaveNotification();
 	}
 
 	UIAutomaticallyRestoreNodePositions() {
@@ -87,6 +90,22 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableWorkspaces)
 					.onChange((value) => {
 						this.plugin.settings.enableWorkspaces = value;
+						this.plugin.saveSettings();
+					})
+			);
+	}
+
+	UIShowSaveNotification() {
+		const { containerEl } = this;
+
+		new Setting(containerEl)
+			.setName('Show notification on save')
+			.setDesc('Display a notice when saving the graph')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showSaveNotification)
+					.onChange((value) => {
+						this.plugin.settings.showSaveNotification = value;
 						this.plugin.saveSettings();
 					})
 			);
