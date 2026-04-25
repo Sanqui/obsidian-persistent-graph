@@ -84,17 +84,12 @@ export default class PersistentGraphPlugin extends Plugin {
 		}
 		if (!graphLeaf) return;
 
+		// set nodes
 		const { nodePositions } = saved;
 		nodePositions.forEach((node) => {
 			graphLeaf.view.renderer.worker.postMessage({
 				forceNode: node,
 			});
-		});
-
-		// force a redraw
-		graphLeaf.view.renderer.worker.postMessage({
-			run: true,
-			alpha: .1
 		});
 
 		// wait for a render, then unlock nodes
@@ -249,21 +244,23 @@ export default class PersistentGraphPlugin extends Plugin {
 			}
 		});
 
-		this.addCommand({
-			id: 'run-graph-simulation',
-			name: 'Run graph simulation',
-			callback: () => {
-				this.runGraphSimulation();
-			}
-		});
+		if (this.settings.enableGraphSimulationCommands) {
+			this.addCommand({
+				id: 'run-graph-simulation',
+				name: 'Run graph simulation',
+				callback: () => {
+					this.runGraphSimulation();
+				}
+			});
 
-		this.addCommand({
-			id: 'stop-graph-simulation',
-			name: 'Stop graph simulation',
-			callback: () => {
-				this.stopGraphSimulation();
-			}
-		});
+			this.addCommand({
+				id: 'stop-graph-simulation',
+				name: 'Stop graph simulation',
+				callback: () => {
+					this.stopGraphSimulation();
+				}
+			});
+		}
 
 		this.addSettingTab(new PersistentGraphSettingTab(this.app, this));
 

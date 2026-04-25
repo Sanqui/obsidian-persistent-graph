@@ -13,6 +13,7 @@ export interface PersistentGraphSettings {
 	enableWorkspaces: boolean;
 	timesShowedRestoredNotification: number;
 	showSaveNotification: boolean;
+	enableGraphSimulationCommands: boolean;
 }
 
 export const DEFAULT_SETTINGS: PersistentGraphSettings = {
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	enableWorkspaces: false,
 	timesShowedRestoredNotification: 0,
 	showSaveNotification: false,
+	enableGraphSimulationCommands: false,
 };
 
 export class PersistentGraphSettingTab extends PluginSettingTab {
@@ -45,6 +47,7 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 		this.UIEnableSaveOptions();
 		this.UIEnableWorkspaces();
 		this.UIShowSaveNotification();
+		this.UIEnableGraphSimulationCommands();
 	}
 
 	UIAutomaticallyRestoreNodePositions() {
@@ -111,5 +114,21 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 			);
 	}
 
+	UIEnableGraphSimulationCommands() {
+		const { containerEl } = this;
+
+		new Setting(containerEl)
+			.setName('Enable graph simulation commands')
+			.setDesc('Controls whether "Run graph simulation" and "Stop graph simulation" commands are available.\n ' +
+				     'Requires restart.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableGraphSimulationCommands)
+					.onChange((value) => {
+						this.plugin.settings.enableGraphSimulationCommands = value;
+						this.plugin.saveSettings();
+					})
+			);
+	}
 
 }
