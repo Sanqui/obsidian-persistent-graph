@@ -45,6 +45,10 @@ export default class PersistentGraphPlugin extends Plugin {
 		await this.loadSettings();
 		this.graphManager = new GraphManager(this);
 
+		if (this.settings.enableAutoSave) {
+			this.graphManager.startAutoSave();
+		}
+
 		this.addCommand({
 			id: 'save-node-positions',
 			name: 'Save graph node positions',
@@ -94,6 +98,9 @@ export default class PersistentGraphPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.settings.enableAutoSave) {
+			this.graphManager.stopAutoSave();
+		}
 	}
 
 	async loadSettings() {

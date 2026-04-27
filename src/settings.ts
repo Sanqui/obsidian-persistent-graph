@@ -4,7 +4,7 @@ import PersistentGraphPlugin from "./main";
 
 export interface PersistentGraphSettings {
 	nodePositions: NodePosition[];
-	globalOptions: any,
+	globalOptions: any;
 	workspacesGraphData: {
 		[key: string]: GraphData;
 	};
@@ -14,18 +14,22 @@ export interface PersistentGraphSettings {
 	timesShowedRestoredNotification: number;
 	showSaveNotification: boolean;
 	enableGraphSimulationCommands: boolean;
+	enableAutoSave: boolean;
+	autoSaveIntervalMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	nodePositions: [],
 	globalOptions: {},
 	workspacesGraphData: {},
-	automaticallyRestoreNodePositions: false,
+	automaticallyRestoreNodePositions: true,
 	enableSaveOptions: false,
 	enableWorkspaces: false,
 	timesShowedRestoredNotification: 0,
 	showSaveNotification: false,
 	enableGraphSimulationCommands: false,
+	enableAutoSave: false,
+	autoSaveIntervalMinutes: 5,
 };
 
 export class PersistentGraphSettingTab extends PluginSettingTab {
@@ -47,6 +51,7 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 		this.UIEnableSaveOptions();
 		this.UIEnableWorkspaces();
 		this.UIShowSaveNotification();
+		this.UIEnableAutoSave();
 		this.UIEnableGraphSimulationCommands();
 	}
 
@@ -114,6 +119,47 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 			);
 	}
 
+	UIEnableAutoSave() {
+		const { containerEl } = this;
+
+		new Setting(containerEl)
+			.setName('Enable Auto Save')
+			.setDesc('Automatically save graph changes')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableAutoSave)
+					.onChange((value) => {
+						this.plugin.settings.enableAutoSave = value;
+						this.plugin.saveSettings();
+						if (value) {
+							this.plugin.graphManager.startAutoSave();
+						} else {
+							this.plugin.graphManager.stopAutoSave();
+						}
+						this.display();
+					})
+			);
+
+		if (this.plugin.settings.enableAutoSave) {
+			new Setting(containerEl)
+				.setName('Auto Save Interval')
+				.setDesc('Interval in minutes to auto save the graph')
+				.addSlider((slider) =>
+					slider
+						.setLimits(1, 60, 1)
+						.setValue(this.plugin.settings.autoSaveIntervalMinutes)
+						.setDynamicTooltip()
+						.onChange((value) => {
+							this.plugin.settings.autoSaveIntervalMinutes = value;
+							this.plugin.saveSettings();
+							if (this.plugin.settings.enableAutoSave) {
+								this.plugin.graphManager.startAutoSave();
+							}
+						})
+				);
+		}
+	}
+
 	UIEnableGraphSimulationCommands() {
 		const { containerEl } = this;
 
@@ -130,5 +176,4 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 					})
 			);
 	}
-
 }

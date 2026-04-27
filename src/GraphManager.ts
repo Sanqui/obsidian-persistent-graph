@@ -3,6 +3,8 @@ import { CustomLeaf, Workspaces, GraphData } from './types';
 import PersistentGraphPlugin from './main';
 
 export class GraphManager {
+	private autoSaveInterval: number | null = null;
+
 	constructor(private plugin: PersistentGraphPlugin) {}
 
 	private get app() {
@@ -203,6 +205,23 @@ export class GraphManager {
 					this.restoreOnceNodeCountStable(leaf, currentNodeCount, 0, totalIterations + 1);
 				}, 200);
 			}
+		}
+	}
+
+	startAutoSave() {
+		// avoid overlapping
+		this.stopAutoSave();
+
+		this.autoSaveInterval = window.setInterval(async () => {
+			this.saveGraphData();
+			await this.plugin.saveSettings();
+		}, (this.settings.autoSaveIntervalMinutes || 5) * 60000);
+	}
+
+	stopAutoSave() {
+		if (this.autoSaveInterval !== null) {
+			window.clearInterval(this.autoSaveInterval);
+			this.autoSaveInterval = null;
 		}
 	}
 }
