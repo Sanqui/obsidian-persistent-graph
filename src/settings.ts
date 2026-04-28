@@ -4,6 +4,7 @@ import PersistentGraphPlugin from "./main";
 
 export interface PersistentGraphSettings {
 	nodePositions: NodePosition[];
+	pinnedNodes: string[];
 	globalOptions: any;
 	workspacesGraphData: {
 		[key: string]: GraphData;
@@ -20,6 +21,7 @@ export interface PersistentGraphSettings {
 
 export const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	nodePositions: [],
+	pinnedNodes: [],
 	globalOptions: {},
 	workspacesGraphData: {},
 	automaticallyRestoreNodePositions: true,

@@ -1,7 +1,7 @@
 import {Plugin, TAbstractFile} from 'obsidian';
 import { CustomLeaf } from './types';
 import { DEFAULT_SETTINGS, PersistentGraphSettings, PersistentGraphSettingTab } from './settings';
-import { GraphManager } from './GraphManager';
+import { GraphManager } from './graphManager';
 import {addGraphButtons, removeGraphButtons} from './ui';
 
 export default class PersistentGraphPlugin extends Plugin {
@@ -14,6 +14,7 @@ export default class PersistentGraphPlugin extends Plugin {
 		const graphLeaves = this.app.workspace.getLeavesOfType('graph');
 		graphLeaves.forEach(leaf => {
 			addGraphButtons(leaf as CustomLeaf, this.graphManager, this);
+			this.graphManager.pinManager.patchWorker(leaf as CustomLeaf);
 		});
 
 		const activeLeaf = this.graphManager.getActiveLeaf();
@@ -47,12 +48,51 @@ export default class PersistentGraphPlugin extends Plugin {
 		await this.loadSettings();
 		this.graphManager = new GraphManager(this);
 
+		// init
 		const graphLeaves = this.app.workspace.getLeavesOfType('graph');
 		graphLeaves.forEach(leaf => {
 			addGraphButtons(leaf as CustomLeaf, this.graphManager, this);
+			this.graphManager.pinManager.patchWorker(leaf as CustomLeaf);
 		});
 
-		// Listener for file/folder renaming. This prevents node positions being lost when they (or their parent folder) are renamed.
+
+		//////////////////////////// Events
+
+		// Node pinning
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				const leaf = this.graphManager.getActiveLeaf();
+				if (!leaf) return;
+
+				const nodeId = file.path;
+				const isPinned = this.graphManager.pinManager.isPinned(nodeId);
+
+				menu.addItem((item) => {
+					item
+						.setTitle(isPinned ? 'Unpin node' : 'Pin node')
+						.setIcon(isPinned ? 'pin-off' : 'pin')
+						.onClick(async () => {
+							if (isPinned) {
+								await this.graphManager.pinManager.unpinNode(nodeId, leaf);
+							} else {
+								await this.graphManager.pinManager.pinNode(nodeId, leaf);
+							}
+						});
+				});
+			})
+		);
+
+		// active-leaf-change works for the most part, but doesn't fire
+		// when going from 'No file is open', so we have to use layout-change
+		this.registerEvent(
+			this.app.workspace.on('layout-change', this.onLayoutChange.bind(this))
+		);
+
+		this.registerEvent(
+			this.app.metadataCache.on('resolved', this.graphManager.freedWorkspacesData.bind(this.graphManager))
+		);
+
+		// File/Folder renaming. This prevents node positions being lost when they (or their parent folder) are renamed.
 		this.registerEvent(
 			this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
 				this.graphManager.handleRename(file, oldPath);
@@ -62,6 +102,8 @@ export default class PersistentGraphPlugin extends Plugin {
 		if (this.settings.enableAutoSave) {
 			this.graphManager.startAutoSave();
 		}
+
+		//////////////////////////// Commands
 
 		this.addCommand({
 			id: 'save-node-positions',
@@ -99,16 +141,6 @@ export default class PersistentGraphPlugin extends Plugin {
 		}
 
 		this.addSettingTab(new PersistentGraphSettingTab(this.app, this));
-
-		// active-leaf-change works for the most part, but doesn't fire
-		// when going from 'No file is open', so we have to use layout-change
-		this.registerEvent(
-			this.app.workspace.on('layout-change', this.onLayoutChange.bind(this))
-		);
-
-		this.registerEvent(
-			this.app.metadataCache.on('resolved', this.graphManager.freedWorkspacesData.bind(this.graphManager))
-		);
 	}
 
 	onunload() {

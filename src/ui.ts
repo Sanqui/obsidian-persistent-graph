@@ -1,6 +1,6 @@
 import { setIcon } from 'obsidian';
 import { CustomLeaf } from './types';
-import { GraphManager } from './GraphManager';
+import { GraphManager } from './graphManager';
 import PersistentGraphPlugin from './main';
 
 export function addGraphButtons(leaf: CustomLeaf, graphManager: GraphManager, plugin: PersistentGraphPlugin) {

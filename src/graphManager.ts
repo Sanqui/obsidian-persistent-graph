@@ -1,11 +1,15 @@
 import {Notice, TAbstractFile} from 'obsidian';
 import { CustomLeaf, Workspaces, GraphData } from './types';
 import PersistentGraphPlugin from './main';
+import {PinManager} from "./pinManager";
 
 export class GraphManager {
 	private autoSaveInterval: number | null = null;
+	public pinManager: PinManager;
 
-	constructor(private plugin: PersistentGraphPlugin) {}
+	constructor(private plugin: PersistentGraphPlugin) {
+		this.pinManager = new PinManager(plugin);
+	}
 
 	private get app() {
 		return this.plugin.app;
@@ -112,13 +116,16 @@ export class GraphManager {
 				const node = nodePositions[i];
 
 				if (!graphLeaf) return;
-				graphLeaf.view.renderer.worker.postMessage({
-					forceNode: {
-						id: node.id,
-						x: null,
-						y: null
-					}
-				});
+
+				if (!this.pinManager.isPinned(node.id)) {
+					graphLeaf.view.renderer.worker.postMessage({
+						forceNode: {
+							id: node.id,
+							x: null,
+							y: null
+						}
+					});
+				}
 			} // end for
 
 			if (this.settings.timesShowedRestoredNotification < 5 ) {
@@ -262,6 +269,15 @@ export class GraphManager {
 				}
 			});
 		}
+
+		//"pinnedNodes": [
+		//     "Home/Languages/Languages.md",
+		//     "create a link.md",
+		//     "Home/Languages/Chinese/HSK1/Presenting myself.md",
+		//     "Home/Languages/Chinese/HSK1/HSK1.md",
+		//     "Home/Languages/Chinese/Chinese.md"
+		//   ],
+		if (this.pinManager.handleRename(file.path, oldPath)) changed = true;
 
 		if (changed) {
 			this.plugin.saveSettings();
