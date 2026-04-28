@@ -2,13 +2,15 @@ import { Plugin } from 'obsidian';
 import { CustomLeaf } from './types';
 import { DEFAULT_SETTINGS, PersistentGraphSettings, PersistentGraphSettingTab } from './settings';
 import { GraphManager } from './GraphManager';
-import { addGraphButtons } from './ui';
+import {addGraphButtons, removeGraphButtons} from './ui';
 
 export default class PersistentGraphPlugin extends Plugin {
 	settings: PersistentGraphSettings;
 	graphManager: GraphManager;
 
 	onLayoutChange() {
+
+		// Without this, opening obsidian with the plugin already enabled won't show the buttons
 		const graphLeaves = this.app.workspace.getLeavesOfType('graph');
 		graphLeaves.forEach(leaf => {
 			addGraphButtons(leaf as CustomLeaf, this.graphManager, this);
@@ -44,6 +46,11 @@ export default class PersistentGraphPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.graphManager = new GraphManager(this);
+
+		const graphLeaves = this.app.workspace.getLeavesOfType('graph');
+		graphLeaves.forEach(leaf => {
+			addGraphButtons(leaf as CustomLeaf, this.graphManager, this);
+		});
 
 		if (this.settings.enableAutoSave) {
 			this.graphManager.startAutoSave();
@@ -101,6 +108,11 @@ export default class PersistentGraphPlugin extends Plugin {
 		if (this.settings.enableAutoSave) {
 			this.graphManager.stopAutoSave();
 		}
+
+		const graphLeaves = this.app.workspace.getLeavesOfType('graph');
+		graphLeaves.forEach(leaf => {
+			removeGraphButtons(leaf as CustomLeaf, this.graphManager, this);
+		});
 	}
 
 	async loadSettings() {

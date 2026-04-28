@@ -24,3 +24,12 @@ export function addGraphButtons(leaf: CustomLeaf, graphManager: GraphManager, pl
 
 	viewActions.prepend(saveBtn, restoreBtn);
 }
+
+export function removeGraphButtons(leaf: CustomLeaf, graphManager: GraphManager, plugin: PersistentGraphPlugin){
+	const container = leaf.view.containerEl;
+	const saveBtn = container.querySelector('.persistent-graph-save-btn');
+	const restoreBtn = container.querySelector('.persistent-graph-restore-btn');
+	saveBtn?.remove();
+	restoreBtn?.remove();
+}
+
