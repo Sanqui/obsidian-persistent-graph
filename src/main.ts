@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import {Plugin, TAbstractFile} from 'obsidian';
 import { CustomLeaf } from './types';
 import { DEFAULT_SETTINGS, PersistentGraphSettings, PersistentGraphSettingTab } from './settings';
 import { GraphManager } from './GraphManager';
@@ -51,6 +51,13 @@ export default class PersistentGraphPlugin extends Plugin {
 		graphLeaves.forEach(leaf => {
 			addGraphButtons(leaf as CustomLeaf, this.graphManager, this);
 		});
+
+		// Listener for file/folder renaming. This prevents node positions being lost when they (or their parent folder) are renamed.
+		this.registerEvent(
+			this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
+				this.graphManager.handleRename(file, oldPath);
+			})
+		);
 
 		if (this.settings.enableAutoSave) {
 			this.graphManager.startAutoSave();

@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import {Notice, TAbstractFile} from 'obsidian';
 import { CustomLeaf, Workspaces, GraphData } from './types';
 import PersistentGraphPlugin from './main';
 
@@ -222,6 +222,49 @@ export class GraphManager {
 		if (this.autoSaveInterval !== null) {
 			window.clearInterval(this.autoSaveInterval);
 			this.autoSaveInterval = null;
+		}
+	}
+
+	// O(n)
+	// Updates ALL node ids when a folder/file is renamed, preventing their position from being lost.
+	// This might be taxing for bigger graphs but it's the only solution I can think of.
+	handleRename(file: TAbstractFile, oldPath: string) {
+		let changed = false;
+
+		// {
+		//       "id": "Home/Books/Clean Code.md",
+		//       "x": 399.21533203125,
+		//       "y": 650.1447143554688
+		//     },
+		const updateNodeIds = (nodes: any[]) => {
+			nodes.forEach(node => {
+				if (node.id === oldPath) { // Exact match
+					node.id = file.path;
+					changed = true;
+				}
+				else if (node.id.startsWith(oldPath + '/')) { // Prefix
+					node.id = file.path + node.id.substring(oldPath.length);
+					changed = true;
+				}
+			});
+		};
+
+		// Update global
+		if (this.settings.nodePositions) {
+			updateNodeIds(this.settings.nodePositions);
+		}
+
+		// Update workspaces.
+		if (this.settings.workspacesGraphData) {
+			Object.values(this.settings.workspacesGraphData).forEach(data => {
+				if (data.nodePositions) {
+					updateNodeIds(data.nodePositions);
+				}
+			});
+		}
+
+		if (changed) {
+			this.plugin.saveSettings();
 		}
 	}
 }
