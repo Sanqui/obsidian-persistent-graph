@@ -72,6 +72,7 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 			{
 				name: 'Enable Auto Save',
 				desc: 'Automatically save graph changes',
+				aliases: ['Auto Save Interval'],
 				render: (setting) => {
 					setting.addToggle((toggle) =>
 						toggle
