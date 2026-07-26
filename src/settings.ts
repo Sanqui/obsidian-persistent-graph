@@ -72,18 +72,41 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 			{
 				name: 'Enable Auto Save',
 				desc: 'Automatically save graph changes',
-				control: { type: 'toggle', key: 'enableAutoSave' },
+				render: (setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.enableAutoSave)
+							.onChange(async (value) => {
+								this.plugin.settings.enableAutoSave = value;
+								await this.plugin.saveSettings();
+								if (value) {
+									this.plugin.graphManager.startAutoSave();
+								} else {
+									this.plugin.graphManager.stopAutoSave();
+								}
+								this.update();
+							})
+					);
+				},
 			},
 			{
 				name: 'Auto Save Interval',
 				desc: 'Interval in minutes to auto save the graph',
 				visible: () => this.plugin.settings.enableAutoSave,
-				control: {
-					type: 'slider',
-					key: 'autoSaveIntervalMinutes',
-					min: 1,
-					max: 60,
-					step: 1,
+				render: (setting) => {
+					setting.addSlider((slider) =>
+						slider
+							.setLimits(1, 60, 1)
+							.setValue(this.plugin.settings.autoSaveIntervalMinutes)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.autoSaveIntervalMinutes = value;
+								await this.plugin.saveSettings();
+								if (this.plugin.settings.enableAutoSave) {
+									this.plugin.graphManager.startAutoSave();
+								}
+							})
+					);
 				},
 			},
 			{
