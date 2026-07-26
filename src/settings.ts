@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, requireApiVersion, Setting } from 'obsidian';
+import type { SettingDefinitionItem } from 'obsidian';
 import {GraphData, NodePosition} from "./types";
 import PersistentGraphPlugin from "./main";
 
@@ -40,6 +41,101 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: PersistentGraphPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	getSettingDefinitions(): SettingDefinitionItem<keyof PersistentGraphSettings>[] {
+		if (!requireApiVersion('1.13.0')) {
+			return [];
+		}
+
+		return [
+			{
+				name: 'Automatically restore node positions',
+				desc: 'Restore node positions every time a graph view is opened',
+				control: { type: 'toggle', key: 'automaticallyRestoreNodePositions' },
+			},
+			{
+				name: 'Save the filtered configuration',
+				desc: 'Filters, Groups, Display, Forces',
+				control: { type: 'toggle', key: 'enableSaveOptions' },
+			},
+			{
+				name: 'Save graph layout separately for each workspace',
+				desc: 'Use workspace name as storage key',
+				control: { type: 'toggle', key: 'enableWorkspaces' },
+			},
+			{
+				name: 'Show notification on save',
+				desc: 'Display a notice when saving the graph',
+				control: { type: 'toggle', key: 'showSaveNotification' },
+			},
+			{
+				name: 'Enable Auto Save',
+				desc: 'Automatically save graph changes',
+				aliases: ['Auto Save Interval'],
+				render: (setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.enableAutoSave)
+							.onChange(async (value) => {
+								this.plugin.settings.enableAutoSave = value;
+								await this.plugin.saveSettings();
+								if (value) {
+									this.plugin.graphManager.startAutoSave();
+								} else {
+									this.plugin.graphManager.stopAutoSave();
+								}
+								this.update();
+							})
+					);
+				},
+			},
+			{
+				name: 'Auto Save Interval',
+				desc: 'Interval in minutes to auto save the graph',
+				visible: () => this.plugin.settings.enableAutoSave,
+				render: (setting) => {
+					setting.addSlider((slider) =>
+						slider
+							.setLimits(1, 60, 1)
+							.setValue(this.plugin.settings.autoSaveIntervalMinutes)
+							.setDynamicTooltip()
+							.onChange(async (value) => {
+								this.plugin.settings.autoSaveIntervalMinutes = value;
+								await this.plugin.saveSettings();
+								if (this.plugin.settings.enableAutoSave) {
+									this.plugin.graphManager.startAutoSave();
+								}
+							})
+					);
+				},
+			},
+			{
+				name: 'Enable graph simulation commands',
+				desc: 'Controls whether "Run graph simulation" and "Stop graph simulation" commands are available.\n Requires restart.',
+				control: { type: 'toggle', key: 'enableGraphSimulationCommands' },
+			},
+		];
+	}
+
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (!(key in this.plugin.settings)) {
+			return;
+		}
+
+		Reflect.set(this.plugin.settings, key, value);
+		await this.plugin.saveSettings();
+
+		if (key === 'enableAutoSave') {
+			if (value) {
+				this.plugin.graphManager.startAutoSave();
+			} else {
+				this.plugin.graphManager.stopAutoSave();
+			}
+			this.update();
+		} else if (key === 'autoSaveIntervalMinutes' && this.plugin.settings.enableAutoSave) {
+			this.plugin.graphManager.startAutoSave();
+		}
 	}
 
 	display(): void {
