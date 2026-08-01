@@ -110,7 +110,18 @@ export class GraphManager {
 			});
 		});
 
-		// wait for a render, then unlock nodes
+		// Obsidian's graph worker ignores forceNode updates after the simulation has
+		// cooled down unless it is explicitly woken.  A very small alpha is enough
+		// to render the fixed coordinates without starting a fresh layout run.
+		graphLeaf.view.renderer.worker.postMessage({
+			run: true,
+			alpha: 0.002,
+			alphaTarget: 0,
+		});
+
+		// A newly-created graph worker can still be running at full alpha. Keep the
+		// restored nodes fixed until that native simulation has cooled (about five
+		// seconds), then release all nodes that were not deliberately pinned.
 		setTimeout(async () => {
 			for (let i = 0; i < nodePositions.length; i++) {
 				const node = nodePositions[i];
@@ -133,7 +144,7 @@ export class GraphManager {
 				this.settings.timesShowedRestoredNotification++;
 				await this.plugin.saveSettings();
 			}
-		}, 600);
+		}, 7000);
 	}
 
 	freedWorkspacesData() {
