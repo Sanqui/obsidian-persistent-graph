@@ -17,6 +17,8 @@ export interface PersistentGraphSettings {
 	enableGraphSimulationCommands: boolean;
 	enableAutoSave: boolean;
 	autoSaveIntervalMinutes: number;
+	enableRestoreAnimation: boolean;
+	restoreAnimationDuration: number;
 }
 
 export const DEFAULT_SETTINGS: PersistentGraphSettings = {
@@ -32,6 +34,8 @@ export const DEFAULT_SETTINGS: PersistentGraphSettings = {
 	enableGraphSimulationCommands: false,
 	enableAutoSave: false,
 	autoSaveIntervalMinutes: 5,
+	enableRestoreAnimation: true,
+	restoreAnimationDuration: 1000,
 };
 
 export class PersistentGraphSettingTab extends PluginSettingTab {
@@ -50,6 +54,7 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 		containerEl.createEl('h2', { text: 'Settings for PersistentGraphPlugin' });
 
 		this.UIAutomaticallyRestoreNodePositions();
+		this.UIEnableRestoreAnimation();
 		this.UIEnableSaveOptions();
 		this.UIEnableWorkspaces();
 		this.UIShowSaveNotification();
@@ -71,6 +76,41 @@ export class PersistentGraphSettingTab extends PluginSettingTab {
 						this.plugin.saveSettings();
 					})
 			);
+	}
+
+	UIEnableRestoreAnimation() {
+		const { containerEl } = this;
+
+		new Setting(containerEl)
+			.setName('Enable restore animation')
+			.setDesc('Smoothly transition nodes to their saved positions instead of snapping instantly')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableRestoreAnimation)
+					.onChange((value) => {
+						this.plugin.settings.enableRestoreAnimation = value;
+						this.plugin.saveSettings();
+						this.display(); // re-render to show/hide duration slider
+					})
+			);
+
+		if (this.plugin.settings.enableRestoreAnimation) {
+			new Setting(containerEl)
+				.setName('Restore animation duration')
+				.setDesc('Duration of the animation in milliseconds')
+				.addText((text) =>
+					text
+						.setPlaceholder('1000')
+						.setValue(this.plugin.settings.restoreAnimationDuration.toString())
+						.onChange((value) => {
+							const parsed = parseInt(value, 10);
+							if (!isNaN(parsed) && parsed > 0) {
+								this.plugin.settings.restoreAnimationDuration = parsed;
+								this.plugin.saveSettings();
+							}
+						})
+				);
+		}
 	}
 
 	UIEnableSaveOptions() {

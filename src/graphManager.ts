@@ -102,38 +102,166 @@ export class GraphManager {
 		}
 		if (!graphLeaf) return;
 
-		// set nodes
 		const { nodePositions } = saved;
-		nodePositions.forEach((node) => {
-			graphLeaf!.view.renderer.worker.postMessage({
-				forceNode: node,
+
+		if (!this.settings.enableRestoreAnimation || this.settings.restoreAnimationDuration <= 0) {
+			// set nodes immediately
+			nodePositions.forEach((node) => {
+				graphLeaf!.view.renderer.worker.postMessage({
+					forceNode: node,
+				});
 			});
-		});
 
-		// wait for a render, then unlock nodes
-		setTimeout(async () => {
-			for (let i = 0; i < nodePositions.length; i++) {
-				const node = nodePositions[i];
+			// wait for a render, then unlock nodes
+			setTimeout(() => {
+				this.finishRestoringGraphData(nodePositions, graphLeaf);
+			}, 600);
+		} else {
+			const baseDuration = this.settings.restoreAnimationDuration;
+			const startTime = Date.now();
+			const globalDelay = 100;
 
-				if (!graphLeaf) return;
+			const currentNodes = graphLeaf.view.renderer.nodes;
+			const currentPositions = new Map();
+			currentNodes.forEach((node: any) => {
+				currentPositions.set(node.id, { x: node.x, y: node.y });
+			});
 
-				if (!this.pinManager.isPinned(node.id)) {
-					graphLeaf.view.renderer.worker.postMessage({
+			const animations = nodePositions.map(targetNode => {
+				const start = currentPositions.get(targetNode.id);
+				const parts = targetNode.id.split('/');
+				
+				let folder = 'root';
+				if (parts.length > 1) {
+					folder = parts.slice(0, -1).join('/');
+				}
+
+				const startX = start && typeof start.x === 'number' ? start.x : targetNode.x;
+				const startY = start && typeof start.y === 'number' ? start.y : targetNode.y;
+				const targetX = targetNode.x;
+				const targetY = targetNode.y;
+				
+				// 計算該節點需要移動的直線距離
+				const distance = Math.sqrt(Math.pow(targetX - startX, 2) + Math.pow(targetY - startY, 2));
+
+				return {
+					id: targetNode.id,
+					startX,
+					startY,
+					targetX,
+					targetY,
+					distance,
+					folder,
+					delay: 0,
+					duration: baseDuration,
+					initialSent: false
+				};
+			});
+
+			// 找出整張圖表移動最遠的距離，用來換算流暢移動的基準
+			const maxDistance = Math.max(...animations.map(a => a.distance), 1); 
+			
+			animations.forEach(anim => {
+				const distanceRatio = anim.distance / maxDistance;
+				// [滑順改善] 提高最低門檻至 350ms，且混合距離權重 (0.35 + 0.65 * ratio)
+				// 避免近距離節點在 150ms 內暴衝抽搐，給予充裕時間進行優雅的漸進滑行
+				anim.duration = Math.max(350, baseDuration * (0.35 + 0.65 * distanceRatio));
+			});
+
+			// 將資料夾按字母排序，讓動畫有規律的波浪感
+			const uniqueFolders = Array.from(new Set(animations.map(a => a.folder))).sort();
+			const folderDelays = new Map<string, number>();
+			uniqueFolders.forEach((folder, index) => {
+				folderDelays.set(folder, index * 70); 
+			});
+
+			animations.forEach(anim => {
+				// [滑順改善] 移除隨機抖動，回歸純淨整齊的波浪節奏，避免鄰近節點視覺雜亂
+				anim.delay = folderDelays.get(anim.folder)!;
+			});
+
+			// 柔和磁吸回彈係數：c1 = 0.6 產生約 1.5% 的微幅越界，如同高級氣壓懸吊般自然沉降
+			const c1 = 0.6;
+			const c3 = c1 + 1;
+
+			const animate = () => {
+				const now = Date.now();
+				let allDone = true;
+
+				animations.forEach(anim => {
+					const elapsed = now - (startTime + globalDelay + anim.delay);
+					if (elapsed < 0) {
+						// 等待中的節點只在第一次發送初始定位
+						if (!anim.initialSent) {
+							graphLeaf!.view.renderer.worker.postMessage({
+								forceNode: { id: anim.id, x: anim.startX, y: anim.startY }
+							});
+							anim.initialSent = true;
+						}
+						allDone = false;
+						return;
+					}
+					
+					// 使用該節點的專屬動畫時長
+					const progress = Math.min(elapsed / anim.duration, 1);
+					
+					// [滑順改善] 單一平滑減速曲線 (Soft back.out 0.6)
+					// 完全去除 elastic.out 多重高頻振盪造成的抽動與粗暴感
+					const easeProgress = progress === 1 ? 1 :
+						1 + c3 * Math.pow(progress - 1, 3) + c1 * Math.pow(progress - 1, 2);
+					
+					const currentX = anim.startX + (anim.targetX - anim.startX) * easeProgress;
+					const currentY = anim.startY + (anim.targetY - anim.startY) * easeProgress;
+					
+					graphLeaf!.view.renderer.worker.postMessage({
 						forceNode: {
-							id: node.id,
-							x: null,
-							y: null
+							id: anim.id,
+							x: currentX,
+							y: currentY
 						}
 					});
-				}
-			} // end for
+					
+					if (progress < 1) {
+						allDone = false;
+					}
+				});
 
-			if (this.settings.timesShowedRestoredNotification < 5 ) {
-				new Notice('Automatically restored node positions');
-				this.settings.timesShowedRestoredNotification++;
-				await this.plugin.saveSettings();
+				if (!allDone) {
+					window.requestAnimationFrame(animate);
+				} else {
+					// wait a bit for render, then unlock nodes
+					setTimeout(() => {
+						this.finishRestoringGraphData(nodePositions, graphLeaf);
+					}, 16);
+				}
+			};
+
+			window.requestAnimationFrame(animate);
+		}
+	}
+
+	private async finishRestoringGraphData(nodePositions: any[], graphLeaf?: CustomLeaf) {
+		for (let i = 0; i < nodePositions.length; i++) {
+			const node = nodePositions[i];
+
+			if (!graphLeaf) return;
+
+			if (!this.pinManager.isPinned(node.id)) {
+				graphLeaf.view.renderer.worker.postMessage({
+					forceNode: {
+						id: node.id,
+						x: null,
+						y: null
+					}
+				});
 			}
-		}, 600);
+		} // end for
+
+		if (this.settings.timesShowedRestoredNotification < 5 ) {
+			new Notice('Automatically restored node positions');
+			this.settings.timesShowedRestoredNotification++;
+			await this.plugin.saveSettings();
+		}
 	}
 
 	freedWorkspacesData() {

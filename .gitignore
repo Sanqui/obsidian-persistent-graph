@@ -17,3 +17,9 @@ main.js
 
 # obsidian
 data.json
+
+# Distribution and build outputs
+dist/
+
+# Scratch & temporary workspace
+scratch/
