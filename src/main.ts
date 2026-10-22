@@ -17,14 +17,19 @@ export default class PersistentGraphPlugin extends Plugin {
 			this.graphManager.pinManager.patchWorker(leaf as CustomLeaf);
 		});
 
-		const activeLeaf = this.graphManager.getActiveLeaf();
-		if (!activeLeaf) return;
+		// Restore every graph leaf, not just the one in the root split,
+		// so that graphs docked in a sidebar are restored too
+		graphLeaves.forEach(leaf => this.autoRestoreLeaf(leaf as CustomLeaf));
+	}
 
-		if (activeLeaf.view.getViewType() != 'graph' || activeLeaf.view.renderer.autoRestored) {
+	autoRestoreLeaf(leaf: CustomLeaf) {
+		// Deferred (background) leaves have no renderer yet; they will be
+		// picked up once they load and the layout changes again
+		if (leaf.isDeferred || !leaf.view.renderer || leaf.view.renderer.autoRestored) {
 			return;
 		}
 
-		activeLeaf.view.renderer.autoRestored = true;
+		leaf.view.renderer.autoRestored = true;
 
 		// avoid rerender
 		const { options } = this.graphManager.getGraphData();
@@ -32,7 +37,7 @@ export default class PersistentGraphPlugin extends Plugin {
 		if (options && options.hasOwnProperty('search')) {
 			initOptions = options;
 		}
-		activeLeaf.view.dataEngine.setOptions({
+		leaf.view.dataEngine.setOptions({
 			...initOptions,
 			'collapse-filter': false,
 		});
@@ -41,7 +46,7 @@ export default class PersistentGraphPlugin extends Plugin {
 		// because not all nodes have been created yet.
 		// So we wait for the node count to stabilize
 		// over 600s.
-		setTimeout(() => this.graphManager.awaitRenderLoaded(activeLeaf), 600);
+		setTimeout(() => this.graphManager.awaitRenderLoaded(leaf), 600);
 	}
 
 	async onload() {
@@ -86,6 +91,16 @@ export default class PersistentGraphPlugin extends Plugin {
 		// when going from 'No file is open', so we have to use layout-change
 		this.registerEvent(
 			this.app.workspace.on('layout-change', this.onLayoutChange.bind(this))
+		);
+
+		// A deferred sidebar graph loads when its tab is first shown,
+		// which makes it the active leaf
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				if (leaf?.view.getViewType() === 'graph') {
+					this.autoRestoreLeaf(leaf as CustomLeaf);
+				}
+			})
 		);
 
 		this.registerEvent(
